@@ -4,6 +4,7 @@ import * as asset from "./asset.mjs";
 import { setStaticWebPath } from "./asset.mjs";
 import {setUploadPath} from "./upload.mjs";
 import {setEnv} from './utils.mjs';
+import {persistToDisk, loadDataFromDisk} from './db.mjs';
 
 const hostname = '127.0.0.1';
 const port = 4200;
@@ -92,7 +93,27 @@ const server = http.createServer((req, res) => {
 
 setStaticWebPath('../frontend');
 setUploadPath('../upload');
-server.listen(port, hostname, () => {
-  console.log(`Server is running at http://${hostname}:${port}/`);
-  setEnv('url', `http://${hostname}:${port}`);
+
+console.log("Load data from disk...");
+const dataFile = "../db/data.json";
+await loadDataFromDisk(dataFile)
+.then((size) => {
+  if (size > 0) {
+    console.log(`Load data from disk: done. ${size} rows found`);
+  } else {
+    console.log("Load data from disk: done. Nothing found");
+  }
+})
+.then(() => {
+  server.listen(port, hostname, () => {
+    console.log(`Server is running at http://${hostname}:${port}/`);
+    setEnv('url', `http://${hostname}:${port}`);
+  })
+})
+
+process.on("SIGINT", () => {
+  console.log("Persist data to disk...")
+  persistToDisk(dataFile);
+  console.log("Persist data to disk: done.")
+  process.exit();
 })

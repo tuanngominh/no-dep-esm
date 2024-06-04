@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "es2022",
+    "checkJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": ["*"]
+    },
+    "typeRoots": ["./"]
+  },
+}

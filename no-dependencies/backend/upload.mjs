@@ -1,20 +1,6 @@
 import path from "path";
-import { fileURLToPath } from 'url';
 import fs from "node:fs/promises";
-
-let uploadPath;
-export function setUploadPath(relativeUploadPath) {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  uploadPath = path.resolve(__dirname + "/" + relativeUploadPath);
-}
-
-export function getUploadPath() {
-  if (!uploadPath) {
-    throw new Error("Upload path is not defined");
-  }
-  return uploadPath;
-}
+import {getEnv, UPLOAD_DIR} from "./utils.mjs";
 
 export async function fileUpload(req, id) {
   const boundary = req.headers['content-type'].split('; ')[1].replace('boundary=', '');
@@ -38,6 +24,7 @@ export async function fileUpload(req, id) {
   const bodyStr = body.toString('binary');
   const parts = bodyStr.split(`--${boundary}`);
 
+  const uploadPath = getEnv(UPLOAD_DIR);
   for (const part of parts) {
     if (part.includes('Content-Disposition: form-data;')) {
       const fileNameMatch = part.match(/filename="(.+)"/);

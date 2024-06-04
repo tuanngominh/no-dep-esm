@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import * as db from './db.mjs';
-import { parseFormData, getUploadUrl } from "./utils.mjs";
-import {fileUpload, getUploadPath} from './upload.mjs';
+import { parseFormData, getUploadUrl, getEnv, UPLOAD_DIR } from "./utils.mjs";
+import {fileUpload} from './upload.mjs';
 import {getContentType} from "./asset.mjs";
 
 export function createTodo(req, res) {
@@ -31,7 +31,7 @@ export async function deleteTodo(req, res) {
   const todoId = req.params.id;
   const item = db.get(todoId);
   if (item?.uploads) {
-    await fs.rm(`${getUploadPath()}/${todoId}`, {recursive: true, force: true})
+    await fs.rm(`${getEnv(UPLOAD_DIR)}/${todoId}`, {recursive: true, force: true})
   }
   db.remove(todoId);
   res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -53,7 +53,7 @@ export async function viewUpload(fileUri, res) {
   const contentType = getContentType(fileUri);
 
   try {
-    const content = await fs.readFile(getUploadPath() + "/" + fileUri);
+    const content = await fs.readFile(getEnv(UPLOAD_DIR) + "/" + fileUri);
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(content);
   } catch (error) {
@@ -64,9 +64,13 @@ export async function viewUpload(fileUri, res) {
 
 export async function deleteUpload(req, res) {
   const {id: todoId, fileName} = req.params;
-  const path = `${getUploadPath()}/${todoId}/${fileName}`;
+  const path = `${getEnv(UPLOAD_DIR)}/${todoId}/${fileName}`;
   await fs.unlink(path)
   db.removeUpload(todoId, fileName);
   res.writeHead(200);
   res.end();
+}
+
+export async function updateTodo(req, res) {
+  throw new Error("Need implementation");
 }

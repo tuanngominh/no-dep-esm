@@ -1,13 +1,6 @@
-import { fileURLToPath } from "url";
 import fs from "node:fs/promises";
 import path from "path";
-
-let webStaticPath;
-export function setStaticWebPath(relativeStaticPath) {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  webStaticPath = path.resolve(__dirname + "/" + relativeStaticPath);
-}
+import {getEnv, ASSET_DIR} from './utils.mjs';
 
 export async function asset(req, res) {
   const defaultContent = '/index.html';
@@ -18,10 +11,11 @@ export async function asset(req, res) {
 
   const contentType = getContentType(file);
 
+  const webStaticPath = getEnv(ASSET_DIR);
   try {
-    const content = await fs.readFile(webStaticPath + file, { encoding: 'utf8' });
+    const content = await fs.readFile(webStaticPath + file);
     res.writeHead(200, { 'Content-Type': contentType });
-    res.end(content, 'utf-8');
+    res.end(content);
   } catch (error) {
     res.writeHead(500);
     res.end(`There is error, ${error.code}`);
@@ -40,7 +34,8 @@ const mimeTypes = {
   '.png': 'image/png',
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
-  '.pdf': 'application/pdf'
+  '.pdf': 'application/pdf',
+  '.ico': 'image/x-icon'
 };
 
 export function getContentType(filePath) {

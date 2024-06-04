@@ -1,8 +1,6 @@
 import fs from "node:fs"
-import path from "path";
 import fsPromises from "node:fs/promises"
-import { fileURLToPath } from 'url';
-import { shortId } from './utils.mjs';
+import { shortId, getEnv, DB_FILE_PATH } from './utils.mjs';
 let todos;
 
 export function create(object) {
@@ -52,18 +50,14 @@ export function list(id) {
   return entries;
 }
 
-export function persistToDisk(file) {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const filePath = path.resolve(__dirname + "/" + file);
+export function persistToDisk() {
+  const filePath = getEnv(DB_FILE_PATH);
 
   fs.writeFileSync(filePath, JSON.stringify(Object.fromEntries(todos)), 'utf8');
 }
 
-export async function loadDataFromDisk(file) {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const filePath = path.resolve(__dirname + "/" + file);
+export async function loadDataFromDisk() {
+  const filePath = getEnv(DB_FILE_PATH);
   todos  = new Map();
   try {
     const content = await fsPromises.readFile(filePath, 'utf8');
@@ -80,7 +74,7 @@ export async function loadDataFromDisk(file) {
       return validatedData.size;
     }
   } catch (e) {
-    console.log(`Data file not exists: ${file}`);
+    console.log(`Data file not exists: ${filePath}`);
     return;
   }
 }

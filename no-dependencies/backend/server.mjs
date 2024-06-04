@@ -1,13 +1,13 @@
 import http from 'http';
 import * as routes from './routes.mjs';
 import * as asset from "./asset.mjs";
-import { setStaticWebPath } from "./asset.mjs";
-import {setUploadPath} from "./upload.mjs";
-import {setEnv} from './utils.mjs';
+import {initEnv, setEnv, getEnv, HOSTNAME, PORT} from './utils.mjs';
 import {persistToDisk, loadDataFromDisk} from './db.mjs';
 
-const hostname = '127.0.0.1';
-const port = 4200;
+initEnv();
+
+const hostname = getEnv(HOSTNAME);
+const port = getEnv(PORT);
 
 const server = http.createServer((req, res) => {
   
@@ -91,12 +91,8 @@ const server = http.createServer((req, res) => {
   asset.asset(req, res);
 })
 
-setStaticWebPath('../frontend');
-setUploadPath('../upload');
-
 console.log("Load data from disk...");
-const dataFile = "../db/data.json";
-await loadDataFromDisk(dataFile)
+await loadDataFromDisk()
 .then((size) => {
   if (size > 0) {
     console.log(`Load data from disk: done. ${size} rows found`);
@@ -113,7 +109,7 @@ await loadDataFromDisk(dataFile)
 
 process.on("SIGINT", () => {
   console.log("Persist data to disk...")
-  persistToDisk(dataFile);
+  persistToDisk();
   console.log("Persist data to disk: done.")
   process.exit();
 })

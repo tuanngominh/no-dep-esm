@@ -1,0 +1,14 @@
+{
+  "name": "vanilla-and-no-deps",
+  "version": "1.0.0",
+  "description": "vanilla todo app without tools and dependencies",
+  "main": "server.mjs",
+  "scripts": {
+    "test": "node --test",
+    "start": "node server.mjs"
+  },
+  "author": "tuannm79@gmail.com",
+  "engines": {
+    "node": "22"
+  }
+}

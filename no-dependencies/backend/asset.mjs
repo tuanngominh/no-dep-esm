@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "path";
-import {getEnv, ASSET_DIR} from './utils.mjs';
+import { getEnv, ASSET_DIR } from "./utils/env.mjs";
 
 export async function asset(req, res) {
   const defaultContent = '/index.html';

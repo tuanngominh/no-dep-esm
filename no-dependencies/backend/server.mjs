@@ -1,15 +1,15 @@
 import http from 'http';
 import * as routes from './routes.mjs';
 import * as asset from "./asset.mjs";
-import {initEnv, setEnv, getEnv, HOSTNAME, PORT} from './utils.mjs';
-import {persistToDisk, loadDataFromDisk} from './db.mjs';
+import { initEnv, getEnv, HOSTNAME, PORT } from "./utils/env.mjs";
+import { getDb } from './db/index.mjs';
 
-initEnv();
+initEnv(import.meta.url);
 
 const hostname = getEnv(HOSTNAME);
 const port = getEnv(PORT);
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   
   console.log(`${req.method} ${req.url}`);
 
@@ -23,7 +23,7 @@ const server = http.createServer((req, res) => {
     req.params = { id, fileName };
     switch(req.method) {
       case 'DELETE': {
-        routes.deleteUpload(req, res);
+        await routes.deleteUpload(req, res);
         return;
       }
     }
@@ -38,7 +38,7 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST') {
       switch(action) {
         case 'upload': {
-          routes.upload(req, res);
+          await routes.upload(req, res);
           return;
         }
       }
@@ -51,13 +51,13 @@ const server = http.createServer((req, res) => {
       case 'DELETE': {
         const id = url.match(todoIdRoute)[1];
         req.params = { id };
-        routes.deleteTodo(req, res);
+        await routes.deleteTodo(req, res);
         return;
       }
       case 'PUT': {
         const id = url.match(todoIdRoute)[1];
         req.params = { id };
-        routes.updateTodo(req, res);
+        await routes.updateTodo(req, res);
         return;
       }
     }
@@ -67,11 +67,11 @@ const server = http.createServer((req, res) => {
     case '/todos': {
       switch (req.method) {
         case 'POST': {
-          routes.createTodo(req, res);
+          await routes.createTodo(req, res);
           break;
         }
         case 'GET': {
-          routes.listTodo(req, res);
+          await routes.listTodo(req, res);
           break;
         }    
       }
@@ -84,32 +84,21 @@ const server = http.createServer((req, res) => {
   if (uploadRouteMatch) {
     const todoId = uploadRouteMatch[1];
     const imageFile = uploadRouteMatch[2];
-    routes.viewUpload(`${todoId}/${imageFile}`, res);
+    await routes.viewUpload(`${todoId}/${imageFile}`, res);
     return;
   }
 
   asset.asset(req, res);
 })
 
-console.log("Load data from disk...");
-await loadDataFromDisk()
-.then((size) => {
-  if (size > 0) {
-    console.log(`Load data from disk: done. ${size} rows found`);
-  } else {
-    console.log("Load data from disk: done. Nothing found");
-  }
-})
-.then(() => {
-  server.listen(port, hostname, () => {
-    console.log(`Server is running at http://${hostname}:${port}/`);
-    setEnv('url', `http://${hostname}:${port}`);
-  })
-})
+server.listen(port, hostname, () => {
+  console.log(`Server is running at http://${hostname}:${port}/`);
+});
 
-process.on("SIGINT", () => {
-  console.log("Persist data to disk...")
-  persistToDisk();
-  console.log("Persist data to disk: done.")
+process.on("SIGINT", async () => {
+  const db = await getDb();
+  if ('cleanup' in db) {
+    await db.cleanup();  
+  }
   process.exit();
 })

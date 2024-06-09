@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import fsPromises from "node:fs/promises"
-import { shortId, getEnv, DB_FILE_PATH } from './utils.mjs';
+import { shortId } from '../utils.mjs';
+import { getEnv, DB_FILE_PATH } from "../utils/env.mjs";
 let todos;
 
 export function create(object) {
@@ -39,7 +40,7 @@ export function get(id) {
   return todos.get(id);
 }
 
-export function list(id) {
+export function list() {
   const entries = [];
   todos.forEach((_, key) => {
     entries.push({
@@ -50,14 +51,17 @@ export function list(id) {
   return entries;
 }
 
-export function persistToDisk() {
+export function cleanup() {
+  console.log("Persist data to disk...")
   const filePath = getEnv(DB_FILE_PATH);
 
   fs.writeFileSync(filePath, JSON.stringify(Object.fromEntries(todos)), 'utf8');
+  console.log("Persist data to disk: done.")
 }
 
-export async function loadDataFromDisk() {
+export async function init() {
   const filePath = getEnv(DB_FILE_PATH);
+  console.log(`Load data from disk ${filePath} ...`);
   todos  = new Map();
   try {
     const content = await fsPromises.readFile(filePath, 'utf8');
@@ -70,8 +74,12 @@ export async function loadDataFromDisk() {
       }
     }
     if (validatedData.size > 0) {
+      console.log(`Load data from disk: done. ${validatedData.size} rows found`);
       todos = validatedData;
       return validatedData.size;
+    } else {
+      console.log("Load data from disk: done. Nothing found");
+      return 0;
     }
   } catch (e) {
     console.log(`Data file not exists: ${filePath}`);

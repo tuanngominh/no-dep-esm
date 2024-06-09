@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "node:fs/promises";
-import {getEnv, UPLOAD_DIR} from "./utils.mjs";
+import { getEnv, UPLOAD_DIR } from "./utils/env.mjs";
 
 export async function fileUpload(req, id) {
   const boundary = req.headers['content-type'].split('; ')[1].replace('boundary=', '');

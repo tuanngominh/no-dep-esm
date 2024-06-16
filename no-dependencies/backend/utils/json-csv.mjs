@@ -55,6 +55,33 @@ export function toKeyValue(object, schema) {
   return keyValue;
 }
 
-export function toNested(object, schema) {
-
+export function toNested(array, schema) {
+  const nestedArr = [];
+  if (!(array?.length > 0)) {
+    return nestedArr;
+  }
+  const schemaFlat = Object.entries(schema);
+  for (const values of array) {
+    const nested = {};
+    for (const [index, fieldValue] of values.entries()) {
+      const [fieldName, fieldType] = schemaFlat[index];
+      switch (fieldType) {
+        case 'string': {
+          nested[fieldName] = String(fieldValue);
+          break;
+        }
+        case 'number': {
+          nested[fieldName] = Number(fieldValue);
+          break;
+        }
+        case 'array': {
+          const index = 0;
+          const regex = /uploads\[(\d+)\]/;
+          nested[fieldValue][index] = 
+        }
+      }
+    }
+    nestedArr.push(nested);
+  }
+  return nestedArr;
 }

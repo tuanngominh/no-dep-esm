@@ -2,8 +2,7 @@
   "compilerOptions": {
     "module": "esnext",
     "target": "es2022",
-    "checkJs": true,
-    "typeRoots": ["./"]
+    "checkJs": true
   },
-  "include": ["./**/*.mjs"]
+  "include": ["./**/*.mjs", "./types.d.ts"]
 }

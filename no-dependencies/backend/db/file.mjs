@@ -32,7 +32,7 @@ export function removeUpload(id, fileName) {
   update(id, item);
 }
 
-export function remove(id) {
+export async function remove(id) {
   todos.delete(id);
 }
 
@@ -40,7 +40,7 @@ export function get(id) {
   return todos.get(id);
 }
 
-export function list() {
+export async function list() {
   const entries = [];
   todos.forEach((_, key) => {
     entries.push({

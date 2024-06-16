@@ -1,28 +1,24 @@
 import fs from "node:fs/promises";
-import {getDb} from './db/index.mjs';
-import { parseFormData, getUploadUrl } from "./utils.mjs";
-import { getEnv, UPLOAD_DIR } from "./utils/env.mjs";
-import {fileUpload} from './upload.mjs';
-import {getContentType} from "./asset.mjs";
+import {getDb} from '../db/index.mjs';
+import { parseFormData, getUploadUrl } from "../utils.mjs";
+import { getEnv, UPLOAD_DIR } from "../utils/env.mjs";
+import {fileUpload} from '../upload.mjs';
+import {getContentType} from "../asset.mjs";
 
 export async function createTodo(req, res) {
-  try {
-    const fields = await parseFormData(req);
-    const db = await getDb();
-    const id = db.create(fields);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      id,
-      ...fields
-    }));  
-  } catch (e) {
-    res.writeHead(500).end();
-  }
+  const fields = await parseFormData(req);
+  const db = await getDb();
+  const id = await db.create(fields);
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    id,
+    ...fields
+  }));  
 }
 
 export async function listTodo(req, res) {
   const db = await getDb();
-  let todos = db.list();
+  let todos = await db.list();
   todos = todos.map(_ => ({
     ..._,
     ...!!_.uploads && {
@@ -36,7 +32,7 @@ export async function listTodo(req, res) {
 export async function deleteTodo(req, res) {
   const todoId = req.params.id;
   const db = await getDb();
-  const item = db.get(todoId);
+  const item = await db.get(todoId);
   if (item?.uploads) {
     await fs.rm(`${getEnv(UPLOAD_DIR)}/${todoId}`, {recursive: true, force: true})
   }

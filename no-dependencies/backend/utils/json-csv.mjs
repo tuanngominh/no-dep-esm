@@ -4,12 +4,13 @@
 
 export function toKeyValue(object, schema) {  
   const keyValue = {};
-  for (const [fieldName, fieldType] of Object.entries(schema)) {
+  for (const [fieldName, fieldTypeDef] of Object.entries(schema)) {
     if (!(fieldName in object)) {
       continue;
     }
-    const fieldValue = object[fieldName]
-    switch (fieldType) {
+    const fieldValue = object[fieldName];
+    const type = fieldTypeDef.type;
+    switch (type) {
       case 'string': {
         keyValue[fieldName] = String(fieldValue);
         break;
@@ -20,7 +21,7 @@ export function toKeyValue(object, schema) {
       }
       case 'array': {
         if (!Array.isArray(fieldValue)) {
-          throw new Error(`${fieldName} field is not ${fieldType} type`);
+          throw new Error(`${fieldName} field is not array type`);
         }
 
         if(fieldValue.length === 0) {
@@ -35,53 +36,93 @@ export function toKeyValue(object, schema) {
         }
         break;
       }
-      case 'object': {
-        if (typeof fieldValue !== 'object') {
-          throw new Error(`${fieldName} field is not ${fieldType} type`);
-        }
-        if (Object.keys(fieldValue).length === 0) {
-          continue;
-        }
-        for(const [key, value] of Object.entries(fieldValue)) {
-          if (typeof value !== 'number' && typeof value !== 'string') {
-            throw Error(`${fieldName}.${key} field: expect string or number. Actual value: ${value}`);
-          }
-          keyValue[`${fieldName}.${key}`] = value;
-        }
-        break;
-      }
     }
   }
   return keyValue;
 }
 
-export function toNested(array, schema) {
-  const nestedArr = [];
-  if (!(array?.length > 0)) {
-    return nestedArr;
-  }
-  const schemaFlat = Object.entries(schema);
-  for (const values of array) {
-    const nested = {};
-    for (const [index, fieldValue] of values.entries()) {
-      const [fieldName, fieldType] = schemaFlat[index];
-      switch (fieldType) {
+const arrayIndexRegex = /([a-zA-Z]+)\[(\d+)\]/;
+export function toNested(flatObject, schema) {
+  const nested = {};
+
+  for (const [fieldName, fieldTypeDef] of Object.entries(schema)) {
+    const type = fieldTypeDef.type;
+    if (['string', 'number'].includes(type) && 
+      fieldName in flatObject &&
+      flatObject[fieldName] !== null &&
+      flatObject[fieldName] !== undefined
+    ) {
+      switch(type) {
         case 'string': {
-          nested[fieldName] = String(fieldValue);
+          nested[fieldName] = String(flatObject[fieldName]);
           break;
         }
         case 'number': {
-          nested[fieldName] = Number(fieldValue);
+          nested[fieldName] = Number(flatObject[fieldName]);
           break;
         }
-        case 'array': {
-          const index = 0;
-          const regex = /uploads\[(\d+)\]/;
-          nested[fieldValue][index] = 
+      }
+      continue;
+    }
+
+    if (type === 'array') {
+      const arrayValue = [];
+      const foundIndexes = [];
+      const arrayElementType = fieldTypeDef.items.type;
+      for(const key in flatObject) {
+        const match = key.match(arrayIndexRegex);
+        if (!match) {
+          continue;
+        }
+        const arrayNameFromInput = match[1];
+        if (arrayNameFromInput !== fieldName) {
+          continue;
+        }
+        const index = parseInt(match[2]);
+        if (isNaN(index)) {
+          continue;
+        }
+        if (flatObject[key] === undefined || flatObject[key] === null) {
+          continue;
+        }
+        if (!foundIndexes.includes(index)) {
+          foundIndexes.push(index);
+          switch(arrayElementType) {
+            case 'string': {              
+              arrayValue.push(String(flatObject[key]));
+              break;
+            }
+            case 'number': {      
+              arrayValue.push(Number(flatObject[key]));
+              break;
+            }
+          }
         }
       }
+      nested[fieldName] = arrayValue;
     }
-    nestedArr.push(nested);
   }
-  return nestedArr;
+
+  return nested;
+}
+
+export function validateSchema(flatHeaders, schema) {
+  const primitiveTypes = ['string', 'number'];
+  for (const header of flatHeaders) {
+    if (header in schema && primitiveTypes.includes(schema[header]?.type)) {
+      continue;
+    }
+
+    const match = header.match(arrayIndexRegex);
+    if (match) {
+      const arrayName = match[1];
+      const index = parseInt(match[2]);
+      if ((arrayName in schema) && !isNaN(index) && schema[arrayName]?.type === 'array') {
+        continue;
+      }
+    }
+    return false;
+  }
+
+  return true;
 }

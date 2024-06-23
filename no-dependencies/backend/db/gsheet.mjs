@@ -1,84 +1,11 @@
-import { createSign } from 'crypto';
-import { readFile } from 'node:fs/promises';
-import { GSHEET_SERVICE_ACCOUNT_EMAIL, GSHEET_SERVICE_ACCOUNT_KEY, GSHEET_SHEET_ID, getEnv } from "../utils/env.mjs";
+import { GSHEET_SHEET_ID, getEnv } from "../utils/env.mjs";
 import { shortId } from '../utils.mjs';
-import {toKeyValue, toNested} from '../utils/json-csv.mjs';
+import * as utils from '../utils/json-csv.mjs';
+import { getAccessToken } from "../utils/google-oauth2.mjs";
 
 /**
  * @typedef {import('../types.mjs').Todo} Todo
  */
-
-async function settings() {
-  const serviceAccountFilePath = getEnv(GSHEET_SERVICE_ACCOUNT_KEY);
-
-  const serviceAccountContent = await readFile(serviceAccountFilePath, 'utf8');
-  const SERVICE_ACCOUNT_KEY_PRIVATE_KEY = JSON.parse(serviceAccountContent).private_key;
-  
-  return {
-    SERVICE_ACCOUNT_EMAIL: getEnv(GSHEET_SERVICE_ACCOUNT_EMAIL),
-    SERVICE_ACCOUNT_KEY_PRIVATE_KEY,
-    SCOPE: 'https://www.googleapis.com/auth/spreadsheets'
-  }
-}
-
-async function createJwt() {
-  const {
-    SERVICE_ACCOUNT_EMAIL,
-    SERVICE_ACCOUNT_KEY_PRIVATE_KEY,
-    SCOPE
-  } = await settings();
-
-  const header = {
-      alg: "RS256",
-      typ: "JWT"
-  };
-
-  const currentTime = Math.floor(Date.now() / 1000);
-  const claimSet = {
-      iss: SERVICE_ACCOUNT_EMAIL,
-      scope: SCOPE,
-      aud: "https://oauth2.googleapis.com/token",
-      exp: currentTime + 3600,
-      iat: currentTime
-  };
-
-  const encodeBase64 = (obj) => Buffer.from(JSON.stringify(obj))
-    .toString('base64')
-    .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-
-  const headerBase64 = encodeBase64(header);
-  const claimSetBase64 = encodeBase64(claimSet);
-
-  const unsignedJwt = `${headerBase64}.${claimSetBase64}`;
-
-  const sign = createSign('RSA-SHA256');
-  sign.update(unsignedJwt);
-  const signatureBase64 = sign.sign(SERVICE_ACCOUNT_KEY_PRIVATE_KEY, 'base64')
-    .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-
-  return `${unsignedJwt}.${signatureBase64}`;
-};
-
-async function getAccessToken() {
-  const jwt = await createJwt();
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&\
-assertion=${jwt}`
-  });
-  if (!response.ok) {
-    throw new Error(`Get access token. HTTP error! status: ${response.status}`);
-  }
-  const responseBody = await response.json();
-  return responseBody.access_token;
-};
 
 async function fetchRequest(uri, options = {}) {
   const accessToken = await getAccessToken();
@@ -113,8 +40,18 @@ async function fetchRequest(uri, options = {}) {
 
 const sheetId = 'Sheet1';
 const schema = {
-  id: 'string',
-  name: 'string'
+  id: {
+    type: 'string'
+  },
+  name: {
+    type: 'string'
+  },
+  uploads: {
+    type: 'array',
+    items: {
+      type: 'string'
+    }
+  }
 }
 
 /**
@@ -130,12 +67,9 @@ async function validateSchema(localSchema) {
     return 'no_schema'
   }
       
-  const localHeader = Object.keys(localSchema);
   const gsheetHeader = result.values[0];
-  if (
-    gsheetHeader.length === localHeader.length &&
-    localHeader.every((value, index) => value === gsheetHeader[index])
-  ) {
+
+  if (utils.validateSchema(gsheetHeader, localSchema)) {
     return 'matched_schema';
   } else {
     return 'non_matched_schema';
@@ -148,7 +82,7 @@ async function validateSchema(localSchema) {
 export async function create(object) {
   const range = `${sheetId}!A:D`;
   const id = shortId();
-  const keyValues = toKeyValue({
+  const keyValues = utils.toKeyValue({
     id,
     ...object
   }, schema);
@@ -186,7 +120,7 @@ export async function create(object) {
 }
 
 export async function list() {
-  return getAllGsheetRows();
+  return (await getAllGsheetRows()).map(_ => _.nested);
 }
 
 async function getGsheetRowIndexByItemId(todoId) {
@@ -222,16 +156,36 @@ async function getGsheetRowIndexByItemId(todoId) {
 async function getAllGsheetRows() {
   const url = `/values/${sheetId}`;
   const result = await fetchRequest(url);
+  const nested = [];
+  const rows = [];
   if (result?.values?.length > 1) {
     const [headers, ...values] = result.values;
-    return toNested(values, schema);
+    for(const value of values) {
+      const flatObject = {};
+      for (let i = 0; i < headers.length; i++) {
+        if (value[i] !== undefined && value[i] !== null) {
+          flatObject[headers[i]] = value[i];
+        }
+      }
+      nested.push();
+      rows.push({
+        headers,
+        values: value,
+        flat: flatObject,
+        nested: utils.toNested(flatObject, schema)
+      })
+    }
   }
-  return [];
+  return rows;
 }
 
 async function getGsheetRowByItemId(todoId) {
   const rows = await getAllGsheetRows();
-  const found = rows.filter(_ => _.id === todoId);
+  const found = rows.map((row, index) => ({
+    row,
+    index
+  }))
+  .filter(_ => _.row.nested.id === todoId)
   if (found.length > 0) {
     return found[0]
   }
@@ -263,6 +217,109 @@ export async function remove(id) {
   });
 }
 
-export async function get(id) {
-  return getGsheetRowByItemId(id);  
+async function updateRow(todoId, newFlatObject, currentGsheetRow, rowIndex) {
+  const keys = Object.keys(newFlatObject);
+  const values = Object.values(newFlatObject);
+  const {headers, values: currentValues} = currentGsheetRow.row;
+
+  const data = [];
+  // this update introduces more columns
+  if (keys.length > headers.length) {
+    data.push({
+      dataFilter: {
+        gridRange: {
+          sheetId: 0,
+          startRowIndex: 0,
+          endRowIndex: 1,
+          startColumnIndex: 0,
+          endColumnIndex: keys.length
+        }
+      },
+      majorDimension: 'ROWS',
+      values: [
+        keys
+      ]
+    })
+  }
+
+  // update actual data
+  data.push({
+    dataFilter: {
+      gridRange: {
+        sheetId: 0,
+        startRowIndex: rowIndex + 1,
+        endRowIndex: rowIndex + 2,
+        startColumnIndex: 0,
+        endColumnIndex: keys.length
+      }
+    },
+    majorDimension: 'ROWS',
+    values: [
+      values
+    ]
+  })
+
+  // remove other cell in the row
+  if(currentValues.length > values.length) {
+    const emptyCells = new Array(currentValues.length - values.length).fill('');
+    data.push({
+      dataFilter: {
+        gridRange: {
+          sheetId: 0,
+          startRowIndex: rowIndex + 1,
+          endRowIndex: rowIndex + 2,
+          startColumnIndex: values.length,
+          endColumnIndex: currentValues.length
+        }
+      },
+      majorDimension: 'ROWS',
+      values: [
+        emptyCells
+      ]
+    })
+  }
+  rowIndex = rowIndex ?? await getGsheetRowIndexByItemId(todoId);
+  const body = {
+    data,
+    valueInputOption: 'USER_ENTERED'
+  };
+  await fetchRequest(`/values:batchUpdateByDataFilter`, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  })
+}
+
+export async function addUpload(todoId, fileName) {
+  const result = await getGsheetRowByItemId(todoId);
+  if (!result) {
+    throw new Error(`No item found with id ${todoId}`);
+  }
+  const {row, index} = result;
+  const uploads = [...row.nested.uploads];
+  if (!uploads.some(_ => _ === fileName)) {
+    uploads.push(fileName);
+  }
+  const newNested = {
+    ...row.nested,
+    uploads
+  }
+  await updateRow(todoId, utils.toKeyValue(newNested, schema), result, index);
+}
+
+export async function removeUpload(todoId, fileName) {
+  const result = await getGsheetRowByItemId(todoId);
+  if (!result) {
+    throw new Error(`No item found with id ${todoId}`);
+  }
+  const {row, index} = result;
+  const nested = row.nested;
+  if (!(nested?.uploads?.length > 0)) {
+    return;
+  }
+  const uploads = [...nested.uploads.filter(_ => _ !== fileName)];
+  const newNested = {
+    ...nested,
+    uploads
+  }
+  await updateRow(todoId, utils.toKeyValue(newNested, schema), result, index);
 }

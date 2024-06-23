@@ -1,8 +1,7 @@
-import fs from "node:fs/promises";
 import {getDb} from '../db/index.mjs';
 import { parseFormData, getUploadUrl } from "../utils.mjs";
-import { getEnv, UPLOAD_DIR } from "../utils/env.mjs";
-import {fileUpload} from '../upload.mjs';
+import {extractFile} from '../utils/upload.mjs';
+import {getUpload } from "../upload/index.mjs";
 import {getContentType} from "../asset.mjs";
 
 export async function createTodo(req, res) {
@@ -34,7 +33,8 @@ export async function deleteTodo(req, res) {
   const db = await getDb();
   const item = await db.get(todoId);
   if (item?.uploads) {
-    await fs.rm(`${getEnv(UPLOAD_DIR)}/${todoId}`, {recursive: true, force: true})
+    const upload = await getUpload();
+    await upload.deleteFolder(todoId);  
   }
   db.remove(todoId);
   res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -43,7 +43,9 @@ export async function deleteTodo(req, res) {
 
 export async function upload(req, res) {
   const id = req.params.id;
-  const {fileUri, fileName} = await fileUpload(req, id);
+  const {fileContent, fileName} = await extractFile(req);
+  const upload = await getUpload();
+  const {fileUri} = await upload.create(id, fileName, fileContent);
   const db = await getDb();
   db.addUpload(id, fileName);
   res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -57,7 +59,8 @@ export async function viewUpload(fileUri, res) {
   const contentType = getContentType(fileUri);
 
   try {
-    const content = await fs.readFile(getEnv(UPLOAD_DIR) + "/" + fileUri);
+    const upload = await getUpload();
+    const content = await upload.getFile(fileUri);
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(content);
   } catch (error) {
@@ -68,8 +71,8 @@ export async function viewUpload(fileUri, res) {
 
 export async function deleteUpload(req, res) {
   const {id: todoId, fileName} = req.params;
-  const path = `${getEnv(UPLOAD_DIR)}/${todoId}/${fileName}`;
-  await fs.unlink(path)
+  const upload = await getUpload();
+  await upload.deleteFile(todoId, fileName);
   const db = await getDb();
   db.removeUpload(todoId, fileName);
   res.writeHead(200);

@@ -9,6 +9,7 @@ export const APP_URL = 'APP_URL';
 export const HOSTNAME = 'HOSTNAME';
 export const PORT = 'PORT';
 export const DB_TYPE = 'DB_TYPE'; // file, gsheet
+export const UPLOAD_TYPE = 'UPLOAD_TYPE'; // file
 export const CREDENTIALS = 'CREDENTIALS';
 export const GSHEET_SERVICE_ACCOUNT_EMAIL = 'GSHEET_SERVICE_ACCOUNT_EMAIL';
 export const GSHEET_SERVICE_ACCOUNT_KEY = 'GSHEET_SERVICE_ACCOUNT_KEY';
@@ -77,7 +78,8 @@ export function initEnv(rootDir) {
     DB_TYPE,
     GSHEET_SERVICE_ACCOUNT_EMAIL,
     GSHEET_SERVICE_ACCOUNT_KEY,
-    GSHEET_SHEET_ID
+    GSHEET_SHEET_ID,
+    UPLOAD_TYPE,
   ]
   for (const key of keysInEnvFile) {
     if (key in envFromFile) {

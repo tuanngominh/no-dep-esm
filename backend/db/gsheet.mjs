@@ -90,7 +90,7 @@ export async function create(object) {
   const values = Object.values(keyValues);
 
   const validateResult = await validateSchema(schema);
-  const headers = Object.keys(schema);
+  const headers = Object.keys(keyValues);
   let rows = [];
   switch(validateResult) {
     case 'no_schema': {
@@ -322,4 +322,8 @@ export async function removeUpload(todoId, fileName) {
     uploads
   }
   await updateRow(todoId, utils.toKeyValue(newNested, schema), result, index);
+}
+
+export async function get(todoId) {
+  return getGsheetRowByItemId(todoId);
 }

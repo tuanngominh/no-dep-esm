@@ -1,6 +1,6 @@
-/no-dependencies/upload
-/no-dependencies/db
-/no-dependencies/credentials
+/upload
+/db
+/credentials
 
 **/.DS_store
 .env

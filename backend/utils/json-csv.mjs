@@ -4,6 +4,7 @@
 
 export function toKeyValue(object, schema) {  
   const keyValue = {};
+  outerLoop:
   for (const [fieldName, fieldTypeDef] of Object.entries(schema)) {
     if (!(fieldName in object)) {
       continue;
@@ -25,7 +26,7 @@ export function toKeyValue(object, schema) {
         }
 
         if(fieldValue.length === 0) {
-          break;
+          continue outerLoop;
         }
 
         for (const [index, value] of fieldValue.entries()) {

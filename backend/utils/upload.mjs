@@ -1,22 +1,4 @@
-import path from "path";
-import { fileURLToPath } from 'url';
-import fs from "node:fs/promises";
-
-let uploadPath;
-export function setUploadPath(relativeUploadPath) {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  uploadPath = path.resolve(__dirname + "/" + relativeUploadPath);
-}
-
-export function getUploadPath() {
-  if (!uploadPath) {
-    throw new Error("Upload path is not defined");
-  }
-  return uploadPath;
-}
-
-export async function fileUpload(req, id) {
+export async function extractFile(req) {
   const boundary = req.headers['content-type'].split('; ')[1].replace('boundary=', '');
   const chunks = [];
 
@@ -53,13 +35,8 @@ export async function fileUpload(req, id) {
         bodyStr.indexOf(part) + fileContentEnd
       );
 
-      const filePath = path.join(uploadPath, id, fileName);
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.writeFile(filePath, fileContent);
-
       return { 
-        filePath,
-        fileUri: path.join(id, fileName),
+        fileContent,
         fileName
       };
     }

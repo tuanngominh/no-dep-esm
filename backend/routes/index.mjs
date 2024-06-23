@@ -1,28 +1,18 @@
-import http from 'http';
-import * as routes from './routes.mjs';
-import * as asset from "./asset.mjs";
-import { setStaticWebPath } from "./asset.mjs";
-import {setUploadPath} from "./upload.mjs";
-import {setEnv} from './utils.mjs';
+import * as asset from "../asset.mjs";
+import * as routes from "./todos.mjs";
 
-const hostname = '127.0.0.1';
-const port = 4200;
-
-const server = http.createServer((req, res) => {
-  
-  console.log(`${req.method} ${req.url}`);
-
+export async function routeHandler(req, res) {
   const url = req.url;
-  
+
   const uploadActionRoute = /^\/todos\/([^\/]+)\/upload\/([^\/]+)$/;
   if (url.match(uploadActionRoute)) {
     const matches = url.match(uploadActionRoute);
     const id = matches[1];
     const fileName = matches[2];
     req.params = { id, fileName };
-    switch(req.method) {
+    switch (req.method) {
       case 'DELETE': {
-        routes.deleteUpload(req, res);
+        await routes.deleteUpload(req, res);
         return;
       }
     }
@@ -35,9 +25,9 @@ const server = http.createServer((req, res) => {
     const action = matches[2];
     req.params = { id };
     if (req.method === 'POST') {
-      switch(action) {
+      switch (action) {
         case 'upload': {
-          routes.upload(req, res);
+          await routes.upload(req, res);
           return;
         }
       }
@@ -50,13 +40,13 @@ const server = http.createServer((req, res) => {
       case 'DELETE': {
         const id = url.match(todoIdRoute)[1];
         req.params = { id };
-        routes.deleteTodo(req, res);
+        await routes.deleteTodo(req, res);
         return;
       }
       case 'PUT': {
         const id = url.match(todoIdRoute)[1];
         req.params = { id };
-        routes.updateTodo(req, res);
+        await routes.updateTodo(req, res);
         return;
       }
     }
@@ -66,13 +56,13 @@ const server = http.createServer((req, res) => {
     case '/todos': {
       switch (req.method) {
         case 'POST': {
-          routes.createTodo(req, res);
+          await routes.createTodo(req, res);
           break;
         }
         case 'GET': {
-          routes.listTodo(req, res);
+          await routes.listTodo(req, res);
           break;
-        }    
+        }
       }
       return;
     }
@@ -83,16 +73,9 @@ const server = http.createServer((req, res) => {
   if (uploadRouteMatch) {
     const todoId = uploadRouteMatch[1];
     const imageFile = uploadRouteMatch[2];
-    routes.viewUpload(`${todoId}/${imageFile}`, res);
+    await routes.viewUpload(`${todoId}/${imageFile}`, res);
     return;
   }
 
   asset.asset(req, res);
-})
-
-setStaticWebPath('../frontend');
-setUploadPath('../upload');
-server.listen(port, hostname, () => {
-  console.log(`Server is running at http://${hostname}:${port}/`);
-  setEnv('url', `http://${hostname}:${port}`);
-})
+}

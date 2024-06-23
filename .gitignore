@@ -1,0 +1,6 @@
+/upload
+/db
+/credentials
+
+**/.DS_store
+.env
